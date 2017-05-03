@@ -85,10 +85,10 @@ class F5Converter(AviConverter):
                 os.makedirs(output_dir)
             is_download_from_host = True
         user_ignore = {}
+        # Read the attributes for user ignore val
         if self.ignore_config:
-            with open(self.ignore_config, "r") as ignore_conf_file:
-                ignore_conf_str = ignore_conf_file.read()
-                user_ignore = json.loads(ignore_conf_str)
+            with open(self.ignore_config) as stream:
+                user_ignore = yaml.safe_load(stream)
         partitions = []
         # Add logger and print avi f5 converter version
         self.print_pip_and_controller_version()
