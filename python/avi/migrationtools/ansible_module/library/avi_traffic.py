@@ -1,4 +1,4 @@
-# Prereq.
+# prerequisite
 # 1. pip install requests
 #
 #
@@ -15,9 +15,6 @@ try:
 except ImportError:
     HAS_REQUEST = False
 
-import json
-
-
 def main():
     """Module instantiation"""
     module = AnsibleModule(
@@ -29,63 +26,65 @@ def main():
     )
 
     if not HAS_REQUEST:
-        module.fail_json(msg='Library not  imported properly')
+        module.fail_json(msg='Library not imported properly')
 
     # Accessing arguments
     uri = module.params.get("ip_address", None)
     request_type = module.params.get('request_type', None)
     port = module.params.get('port', None)
+    # Send http get requests to generate traffic
     if request_type == 'http' or request_type == 'https':
         for i in range(0, 10):
             try:
                 response = requests.get(request_type + '://' + uri + ':' + port,
                                         verify=False)
             except:
-                module.fail_json(msg='Virtual service is down')
+                module.fail_json(msg='Virtualservice is down')
             if response.status_code >= 200 and response.status_code <= 299:
                 continue
             else:
-                module.fail_json(msg='VirtualService is down')
+                module.fail_json(msg='Virtualservice is down')
                 break
 
         if response.status_code >= 200 and response.status_code <= 299:
             module.exit_json(
-                stdout='Virtual service Traffic send successfully',
+                stdout='Virtualservice Traffic sent successfully',
                 changed=True
             )
         else:
             module.exit_json(
-                stderr='VirtualService is not reachable',
+                stderr='Virtualservice is not reachable',
                 changed=False
             )
-
+    # Send tcp requests traffic if 0 then Success else False
     elif request_type == 'tcp':
         command = 'nc -w 2 %s %s' % (uri, port)
         cmd = shlex.split(command)
         out = call(cmd)
         if not out:
             module.exit_json(
-                stderr='Tcp Traffic send successfully',
+                stderr='Tcp Traffic sent successfully',
                 changed=True
             )
         else:
             module.exit_json(
-                stderr='Tcp Traffic Failed',
+                stderr='Tcp Traffic failed',
                 changed=False
             )
+    # type dns then do the dns lookup
     elif request_type == 'dns':
         try:
             ip = socket.gethostbyname('google.com')
         except:
-            module.fail_json(msg='Not Valid DNS')
+            module.fail_json(msg='Not valid dns')
         if ip:
             module.exit_json(
-                stderr='Dns Look up successful %s' % ip,
+                stderr='Dns Lookup successful %s' % ip,
                 changed=True
             )
         else:
             module.exit_json(
-                stderr='Dns Look up unsuccessful',
+                stderr='Dns Lookup unsuccessful',
                 changed=False
             )
 
