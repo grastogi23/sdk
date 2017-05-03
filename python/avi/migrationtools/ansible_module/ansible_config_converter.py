@@ -353,7 +353,7 @@ class AviAnsibleConverter(object):
         :return:
         """
         for vs in self.avi_cfg['VirtualService']:
-            if True:#self.get_status_vs(vs['name'],f5server, username, password):
+            if self.get_status_vs(vs['name'], f5server, username, password):
                 vs_dict = dict()
                 vs_dict['name'] = vs['name']
                 vs_dict['ip_address'] = vs['vip'][0]['ip_address']
@@ -384,8 +384,8 @@ class AviAnsibleConverter(object):
             if obj_type not in self.avi_cfg or obj_type in self.skip_types:
                 continue
             self.build_ansible_objects(obj_type, self.avi_cfg[obj_type], ad)
-        #if f5server and f5user and f5password:
-        self.generate_traffic(ad, f5server, f5user, f5password)
+        if f5server and f5user and f5password:
+            self.generate_traffic(ad, f5server, f5user, f5password)
         with open('%s/avi_config.yml' % self.outdir, "w+") as outf:
             outf.write('# Auto-generated from Avi Configuration\n')
             outf.write('---\n')
