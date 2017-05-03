@@ -21,7 +21,7 @@ LOG = logging.getLogger(__name__)
 
 def convert(ns_config_dict, tenant_name, cloud_name, version, output_dir,
             input_dir, skipped_cmds, vs_state, profile_merge_check,
-            key_passphrase=None):
+            key_passphrase=None, user_ignore={}):
     """
     This functions defines that it convert service/servicegroup to pool
     Convert pool group of netscalar bind lb vserver configuration
@@ -33,6 +33,9 @@ def convert(ns_config_dict, tenant_name, cloud_name, version, output_dir,
     :param input_dir: Input dir is to keep cert and keys
     :param skipped_cmds: List of skipped commands
     :param vs_state: VS state
+    :param profile_merge_check: Flag of profile merge
+    :param key_passphrase: path of passphrase yaml file
+    :param user_ignore: Dict of user ignore attributes
     :return: None
     """
 
@@ -84,25 +87,28 @@ def convert(ns_config_dict, tenant_name, cloud_name, version, output_dir,
             }
         }
 
-        monitor_converter = MonitorConverter(tenant_name, cloud_name,
-                                             tenant_ref, cloud_ref)
+        monitor_converter = MonitorConverter(
+            tenant_name, cloud_name, tenant_ref, cloud_ref, user_ignore)
         monitor_converter.convert(ns_config_dict, avi_config, input_dir)
 
-        profile_converter = \
-            ProfileConverter(tenant_name, cloud_name,tenant_ref, cloud_ref,
-                             ssl_ciphers, profile_merge_check, key_passphrase)
+        profile_converter = ProfileConverter(
+            tenant_name, cloud_name,tenant_ref, cloud_ref, ssl_ciphers,
+            profile_merge_check, user_ignore, key_passphrase)
         profile_converter.convert(ns_config_dict, avi_config, input_dir)
 
-        service_converter = ServiceConverter(tenant_name, cloud_name,tenant_ref,
-                                             cloud_ref, profile_merge_check)
+        service_converter = ServiceConverter(
+            tenant_name, cloud_name,tenant_ref, cloud_ref, profile_merge_check,
+            user_ignore)
         service_converter.convert(ns_config_dict, avi_config)
 
-        lbvs_converter = LbvsConverter(tenant_name, cloud_name, tenant_ref,
-                                       cloud_ref, profile_merge_check)
+        lbvs_converter = LbvsConverter(
+            tenant_name, cloud_name, tenant_ref, cloud_ref, profile_merge_check,
+            user_ignore)
         lbvs_converter.convert(ns_config_dict, avi_config, vs_state)
 
-        csvs_converter = CsvsConverter(tenant_name, cloud_name, tenant_ref,
-                                       cloud_ref, profile_merge_check)
+        csvs_converter = CsvsConverter(
+            tenant_name, cloud_name, tenant_ref, cloud_ref, profile_merge_check,
+            user_ignore)
         csvs_converter.convert(ns_config_dict, avi_config, vs_state)
 
         # Add status for skipped netscalar commands in CSV/report

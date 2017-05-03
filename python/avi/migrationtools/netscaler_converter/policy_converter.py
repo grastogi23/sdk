@@ -10,7 +10,7 @@ import avi.migrationtools.netscaler_converter.ns_constants as ns_constants
 from avi.migrationtools.netscaler_converter import ns_util
 from avi.migrationtools.netscaler_converter.ns_constants \
     import (STATUS_SKIPPED, STATUS_SUCCESSFUL, STATUS_DATASCRIPT,
-            OBJECT_TYPE_POOL_GROUP)
+            OBJECT_TYPE_POOL_GROUP, OBJECT_TYPE_STRING_GROUP)
 
 
 
@@ -22,7 +22,7 @@ class PolicyConverter(object):
     This class is used to convert the policy
     """
     def __init__(self, tenant_name, cloud_name, tenant_ref, cloud_ref,
-                 bind_skipped, na_attrs, ignore_vals):
+                 bind_skipped, na_attrs, ignore_vals, user_ignore):
         """
         Construct a new 'PolicyConverter' object.
         :param tenant_name: Name of tenant
@@ -32,6 +32,7 @@ class PolicyConverter(object):
         :param bind_skipped: list of skipped attributes for profiles
         :param na_attrs: List of not applicable attributes for profiles
         :param ignore_vals: Dict of key pair of attribute and value for ignore
+        :param user_ignore_val: List of user ignore attributes
         """
 
         self.policyconverter_policy_types = \
@@ -45,6 +46,8 @@ class PolicyConverter(object):
         self.bind_skipped = bind_skipped
         self.na_attrs = na_attrs
         self.ignore_vals = ignore_vals
+        # List of ignore val attributes for policy netscaler command.
+        self.user_ignore = user_ignore
 
     def convert(self, bind_conf_list, ns_config, avi_config, tmp_pool_ref,
                 redirect_pools, netscalar_command, case_sensitive):
@@ -109,12 +112,11 @@ class PolicyConverter(object):
                     if targetVserver:
                         # Add status successful in CSV/report for bind if it has
                         # targetVserver
-                        ns_util.add_status_row(policyLabels[0]['line_no'],
-                                               policy_label_netscalar_command,
-                                               policyLabelName,
-                                               policy_label_netscalar_full_command,
-                                               STATUS_SUCCESSFUL,
-                                               policyLabels[0])
+                        ns_util.add_status_row(
+                            policyLabels[0]['line_no'],
+                            policy_label_netscalar_command, policyLabelName,
+                            policy_label_netscalar_full_command,
+                            STATUS_SUCCESSFUL, policyLabels[0])
                         LOG.info('Conversion successful : %s %s' %
                                  (policy_label_netscalar_command,
                                   policyLabelName))
@@ -123,11 +125,11 @@ class PolicyConverter(object):
                         skipped_status = 'Skipped: Do not have target vserver' \
                                          ' %s %s' % (
                             policy_label_netscalar_command, policyLabelName)
-                        ns_util.add_status_row(policyLabels[0]['line_no'],
-                                               policy_label_netscalar_command,
-                                               policyLabelName,
-                                               policy_label_netscalar_full_command,
-                                               STATUS_SKIPPED, skipped_status)
+                        ns_util.add_status_row(
+                            policyLabels[0]['line_no'],
+                            policy_label_netscalar_command, policyLabelName,
+                            policy_label_netscalar_full_command, STATUS_SKIPPED,
+                            skipped_status)
                         LOG.warning(skipped_status)
             if 'policyName' in bind_conf:
                 policy_name = bind_conf['policyName']
@@ -178,7 +180,8 @@ class PolicyConverter(object):
                                                    case_sensitive)
             conv_status = ns_util.get_conv_status(
                 bind_conf, self.bind_skipped, self.na_attrs, [],
-                ignore_for_val=self.ignore_vals)
+                ignore_for_val=self.ignore_vals,
+                user_ignore_val=self.user_ignore)
             # TODO add support for || and + rules as datascript
             if rule == STATUS_DATASCRIPT:
                 # Add status datascript in CSV/report if policy has status
@@ -497,7 +500,6 @@ class PolicyConverter(object):
                         'HTTP.REQ.URL.STARTSWITH' in query.upper():
             match = {"query": path_query}
             match["query"]["match_criteria"] = "QUERY_MATCH_CONTAINS"
-
             matches = re.findall('\\\\(.+?)\\\\', query)
             if len(matches) == 0:
                 LOG.warning('No Matches found for %s' % query)
@@ -509,7 +511,7 @@ class PolicyConverter(object):
                                 'HTTP.REQ.URL.PATH_AND_QUERY.CONTAINS' \
                                 in query.upper():
                     element = re.sub('[\\\/]', '', element)
-                    match["query"]["match_str"].append(element)
+                match["query"]["match_str"].append(element)
 
         elif 'REQ.IP.SOURCEIP' in query.upper():
             match = {"client_ip": client_ip}
@@ -575,14 +577,17 @@ class PolicyConverter(object):
                 element = re.sub('[\\\/]', '', element)
                 match["host_hdr"]["value"].append(element)
 
-        elif ('HTTP.REQ.COOKIE' in query.upper() and 'CONTAINS' in query.upper()) \
-                or ('HTTP.REQ.COOKIE' in query.upper() and 'EQ(' in query.upper()):
+        elif ('HTTP.REQ.COOKIE' in query.upper()
+              and 'CONTAINS' in query.upper()) \
+                or ('HTTP.REQ.COOKIE' in query.upper()
+                    and 'EQ(' in query.upper()):
             match = {"cookie": cookie}
             matches = re.findall('\\\\(.+?)\\\\', query)
             if len(matches) != 2:
                 LOG.warning('No Matches found for %s' % query)
                 return None
-            if 'HTTP.REQ.COOKIE' in query.upper() and 'CONTAINS' in query.upper():
+            if 'HTTP.REQ.COOKIE' in query.upper() and \
+                            'CONTAINS' in query.upper():
                 match["cookie"]["match_criteria"] = "HDR_CONTAINS"
             elif 'HTTP.REQ.COOKIE' in query.upper() and 'EQ' in query.upper():
                 match["cookie"]["match_criteria"] = "HDR_EQUALS"
@@ -614,9 +619,12 @@ class PolicyConverter(object):
                 regex_match.append(regex)
             string_group_ref = self.add_string_group_for_policy(
                 '%s-string_group_object' % policy_name, regex_match, avi_config)
-            match["path"]["string_group_refs"].append(string_group_ref)
+            updated_string_group_ref = ns_util.get_object_ref(
+                string_group_ref, OBJECT_TYPE_STRING_GROUP, self.tenant_name)
+            match["path"]["string_group_refs"].append(updated_string_group_ref)
 
-        elif 'HTTP.REQ.URL.PATH.GET' in query.upper() and 'EQ(' in query.upper():
+        elif 'HTTP.REQ.URL.PATH.GET' in query.upper() \
+                and 'EQ(' in query.upper():
             match = {"path": path_query}
             match["path"]["match_criteria"] = "EQUALS"
             match["path"]["match_str"] = []
@@ -1170,5 +1178,3 @@ class PolicyConverter(object):
         if responder_policy:
             return responder_policy, 'responder'
         return None, None
-
-
